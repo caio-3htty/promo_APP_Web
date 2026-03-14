@@ -15,6 +15,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { I18nProvider } from "@/i18n/I18nProvider";
 
 import Dashboard from "./pages/Dashboard";
+import AccessRequestReview from "./pages/AccessRequestReview";
 import EstoqueManager from "./pages/EstoqueManager";
 import FornecedoresManager from "./pages/FornecedoresManager";
 import Index from "./pages/Index";
@@ -39,6 +40,7 @@ const App = () => (
           <BrowserRouter>
             <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/acesso/avaliar" element={<AccessRequestReview />} />
 
             <Route
               path="/"
