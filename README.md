@@ -1,4 +1,4 @@
-﻿# Promo App Web
+# Promo App Web
 
 Aplicacao web principal do Prumo (Vite + React + Supabase).
 
