@@ -1,5 +1,5 @@
 {
-  "name": "prumo-web-client",
+  "name": "promo-app-web-client",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,14 +9,21 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:embedded": "vite build --mode embedded",
     "build:dev": "vite build --mode development",
+    "browserslist:update": "npx update-browserslist-db@latest",
+    "bundle:report": "node scripts/bundle-report.mjs",
+    "bundle:check": "node scripts/check-bundle-budget.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "ci:verify": "npm run lint && npm run test && npm run build && npm run bundle:report && npm run bundle:check",
+    "cleanup:depcheck": "node scripts/depcheck-clean.mjs",
+    "cleanup:analyze": "npx ts-prune -p tsconfig.json && npm run cleanup:depcheck",
+    "cleanup:verify": "npm run cleanup:analyze && npm run ci:verify"
   },
   "dependencies": {
-    "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
     "@radix-ui/react-aspect-ratio": "^1.1.7",
@@ -69,9 +76,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
-    "@tailwindcss/typography": "^0.5.16",
     "@testing-library/jest-dom": "^6.6.0",
-    "@testing-library/react": "^16.0.0",
     "@types/node": "^22.16.5",
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",

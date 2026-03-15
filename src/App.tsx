@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { lazy, Suspense, type ReactElement } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -14,21 +15,31 @@ import {
 import { AuthProvider } from "@/hooks/useAuth";
 import { I18nProvider } from "@/i18n/I18nProvider";
 
-import Dashboard from "./pages/Dashboard";
-import EstoqueManager from "./pages/EstoqueManager";
-import FornecedoresManager from "./pages/FornecedoresManager";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
-import MateriaisManager from "./pages/MateriaisManager";
-import MaterialFornecedorManager from "./pages/MaterialFornecedorManager";
 import NotFound from "./pages/NotFound";
-import ObrasManager from "./pages/ObrasManager";
-import PedidosCompraManager from "./pages/PedidosCompraManager";
-import RecebimentoManager from "./pages/RecebimentoManager";
-import SemAcesso from "./pages/SemAcesso";
-import UsuariosAcessos from "./pages/UsuariosAcessos";
+
+const AccessRequestReview = lazy(() => import("./pages/AccessRequestReview"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const EstoqueManager = lazy(() => import("./pages/EstoqueManager"));
+const FornecedoresManager = lazy(() => import("./pages/FornecedoresManager"));
+const MateriaisManager = lazy(() => import("./pages/MateriaisManager"));
+const MaterialFornecedorManager = lazy(() => import("./pages/MaterialFornecedorManager"));
+const ObrasManager = lazy(() => import("./pages/ObrasManager"));
+const PedidosCompraManager = lazy(() => import("./pages/PedidosCompraManager"));
+const RecebimentoManager = lazy(() => import("./pages/RecebimentoManager"));
+const SemAcesso = lazy(() => import("./pages/SemAcesso"));
+const UsuariosAcessos = lazy(() => import("./pages/UsuariosAcessos"));
 
 const queryClient = new QueryClient();
+
+const RouteFallback = () => (
+  <div className="p-4 text-sm text-muted-foreground">Carregando modulo...</div>
+);
+
+const lazyPage = (element: ReactElement) => (
+  <Suspense fallback={<RouteFallback />}>{element}</Suspense>
+);
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -38,43 +49,44 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
-            <Route path="/login" element={<Login />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/acesso/avaliar" element={lazyPage(<AccessRequestReview />)} />
 
-            <Route
-              path="/"
-              element={(
-                <ProtectedRoute>
-                  <Index />
-                </ProtectedRoute>
-              )}
-            />
-            <Route
-              path="/sem-acesso"
-              element={(
-                <ProtectedRoute>
-                  <SemAcesso />
-                </ProtectedRoute>
-              )}
-            />
-            <Route
-              path="/obras"
-              element={(
-                <ProtectedRoute>
-                  <RequireOperationalAccess>
-                    <RequirePermission permission="obras.view">
-                      <ObrasManager />
-                    </RequirePermission>
-                  </RequireOperationalAccess>
-                </ProtectedRoute>
-              )}
-            />
+              <Route
+                path="/"
+                element={(
+                  <ProtectedRoute>
+                    <Index />
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/sem-acesso"
+                element={(
+                  <ProtectedRoute>
+                    {lazyPage(<SemAcesso />)}
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/obras"
+                element={(
+                  <ProtectedRoute>
+                    <RequireOperationalAccess>
+                      <RequirePermission permission="obras.view">
+                        {lazyPage(<ObrasManager />)}
+                      </RequirePermission>
+                    </RequireOperationalAccess>
+                  </ProtectedRoute>
+                )}
+              />
               <Route
                 path="/usuarios-acessos"
                 element={(
                   <ProtectedRoute>
                     <RequirePermission permission="users.manage">
                       <RequireRole allowed={["master", "gestor"]}>
-                        <UsuariosAcessos />
+                        {lazyPage(<UsuariosAcessos />)}
                       </RequireRole>
                     </RequirePermission>
                   </ProtectedRoute>
@@ -86,7 +98,7 @@ const App = () => (
                   <ProtectedRoute>
                     <RequireOperationalAccess>
                       <RequirePermission permission="fornecedores.view">
-                        <FornecedoresManager />
+                        {lazyPage(<FornecedoresManager />)}
                       </RequirePermission>
                     </RequireOperationalAccess>
                   </ProtectedRoute>
@@ -98,7 +110,7 @@ const App = () => (
                   <ProtectedRoute>
                     <RequireOperationalAccess>
                       <RequirePermission permission="materiais.view">
-                        <MateriaisManager />
+                        {lazyPage(<MateriaisManager />)}
                       </RequirePermission>
                     </RequireOperationalAccess>
                   </ProtectedRoute>
@@ -110,7 +122,7 @@ const App = () => (
                   <ProtectedRoute>
                     <RequireOperationalAccess>
                       <RequirePermission permission="material_fornecedor.view">
-                        <MaterialFornecedorManager />
+                        {lazyPage(<MaterialFornecedorManager />)}
                       </RequirePermission>
                     </RequireOperationalAccess>
                   </ProtectedRoute>
@@ -124,7 +136,7 @@ const App = () => (
                     <RequireOperationalAccess>
                       <RequireObraAccess>
                         <RequireObraPermission permission="obras.view">
-                          <Dashboard />
+                          {lazyPage(<Dashboard />)}
                         </RequireObraPermission>
                       </RequireObraAccess>
                     </RequireOperationalAccess>
@@ -138,7 +150,7 @@ const App = () => (
                     <RequireOperationalAccess>
                       <RequireObraAccess>
                         <RequireObraPermission permission="pedidos.view">
-                          <PedidosCompraManager />
+                          {lazyPage(<PedidosCompraManager />)}
                         </RequireObraPermission>
                       </RequireObraAccess>
                     </RequireOperationalAccess>
@@ -152,7 +164,7 @@ const App = () => (
                     <RequireRole allowed={["master", "gestor", "almoxarife", "engenheiro"]}>
                       <RequireObraAccess>
                         <RequireObraPermission anyOf={["pedidos.view", "pedidos.receive"]}>
-                          <RecebimentoManager />
+                          {lazyPage(<RecebimentoManager />)}
                         </RequireObraPermission>
                       </RequireObraAccess>
                     </RequireRole>
@@ -166,7 +178,7 @@ const App = () => (
                     <RequireRole allowed={["master", "gestor", "almoxarife", "engenheiro"]}>
                       <RequireObraAccess>
                         <RequireObraPermission permission="estoque.view">
-                          <EstoqueManager />
+                          {lazyPage(<EstoqueManager />)}
                         </RequireObraPermission>
                       </RequireObraAccess>
                     </RequireRole>

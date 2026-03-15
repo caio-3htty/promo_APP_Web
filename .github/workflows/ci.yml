@@ -25,8 +25,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
-        run: npm run build
+      - name: Lint
+        run: npm run lint
 
       - name: Test
         run: npm run test
+
+      - name: Build
+        run: npm run build
+
+      - name: Bundle report
+        run: npm run bundle:report
+
+      - name: Bundle budget check
+        run: npm run bundle:check
+
+      - name: Upload bundle report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-bundle-report
+          path: |
+            dist/bundle-report.json
+            dist/bundle-report.txt

@@ -1,0 +1,21 @@
+{
+  "recordedAt": "2026-03-15T00:00:00.000Z",
+  "preRouteSplitting": {
+    "mainChunk": {
+      "file": "assets/index-DqLi3x9X.js",
+      "sizeBytes": 727768,
+      "gzipBytes": 207018
+    },
+    "jsChunkCount": 1,
+    "totalJsBytes": 727768
+  },
+  "postRouteSplitting": {
+    "mainChunk": {
+      "file": "assets/index-j6gqEaBx.js",
+      "sizeBytes": 89718,
+      "gzipBytes": 26977
+    },
+    "jsChunkCount": 23,
+    "totalJsBytes": 735901
+  }
+}
