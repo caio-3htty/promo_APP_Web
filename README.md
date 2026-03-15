@@ -32,6 +32,12 @@ npm run bundle:report
 npm run bundle:check
 ```
 
+## Code Hygiene
+```bash
+npm run cleanup:analyze
+npm run cleanup:verify
+```
+
 ## Performance Budget
 - Baseline inicial: `docs/performance/bundle-baseline.json`
 - Orcamento vigente: `docs/performance/bundle-budget.json`
