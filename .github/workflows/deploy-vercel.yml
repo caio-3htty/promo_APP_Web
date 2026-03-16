@@ -10,8 +10,8 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
-      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+      VITE_SUPABASE_URL: https://awkvzbpnihtgceqdwisc.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_czq_XwvIyrAeg1lXbuh7pQ_XjfeonmL
     steps:
       - name: Checkout
         uses: actions/checkout@v4
