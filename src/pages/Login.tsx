@@ -75,31 +75,31 @@ const Login = () => {
           const normalizedMessage = message.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
           if (normalizedMessage.includes("empresa") && normalizedMessage.includes("nao encontrada")) {
-            toast.error("Empresa não encontrada", {
-              description: "Confira o nome da empresa ou solicite primeiro a criação da conta empresa.",
+            toast.error("Empresa nao encontrada", {
+              description: "Confira o nome da empresa ou solicite primeiro a criacao da conta empresa.",
             });
           } else if (normalizedMessage.includes("empresa") && normalizedMessage.includes("ja existe")) {
-            toast.error("Empresa já cadastrada", {
+            toast.error("Empresa ja cadastrada", {
               description: "Use o fluxo de conta interna para solicitar acesso.",
             });
           } else if (normalizedMessage.includes("ja esta cadastrado") || normalizedMessage.includes("already")) {
-            toast.error("E-mail já cadastrado", {
+            toast.error("E-mail ja cadastrado", {
               description: "Use outro e-mail ou recupere a senha da conta existente.",
             });
           } else {
-            toast.error(functionMessage ?? "Erro ao criar solicitação.", {
+            toast.error(functionMessage ?? "Erro ao criar solicitacao.", {
               description: t("createAccountError"),
             });
           }
         } else {
           if (signupMode === "company_owner") {
             toast.success("Conta empresa criada", {
-              description: "A conta master foi criada com sucesso. Faça login para continuar.",
+              description: "A conta master foi criada com sucesso. Faca login para continuar.",
             });
           } else {
-            toast.success("Solicitação enviada", {
+            toast.success("Solicitacao enviada", {
               description:
-                "A empresa recebeu um e-mail para aprovar, rejeitar ou editar seu usuário e cargo. A senha não é compartilhada.",
+                "A empresa recebeu um e-mail para aprovar, rejeitar ou editar seu usuario e cargo. A senha nao e compartilhada.",
             });
           }
         }
@@ -109,11 +109,11 @@ const Login = () => {
         if (error) {
           const message = error.message.toLowerCase();
           if (message.includes("invalid login credentials")) {
-            toast.error("Credenciais inválidas", {
-              description: "E-mail/senha incorretos ou conta ainda não existe neste ambiente.",
+            toast.error("Credenciais invalidas", {
+              description: "E-mail/senha incorretos ou conta ainda nao existe neste ambiente.",
             });
           } else if (message.includes("email not confirmed")) {
-            toast.error("E-mail não confirmado", {
+            toast.error("E-mail nao confirmado", {
               description: "Confirme seu e-mail antes de entrar.",
             });
           } else {
@@ -211,11 +211,11 @@ const Login = () => {
 
               {isSignUp && (
                 <div className="space-y-2">
-                  <Label htmlFor="username">Usuário (nome exibido)</Label>
+                  <Label htmlFor="username">Usuario (nome exibido)</Label>
                   <Input
                     id="username"
                     type="text"
-                    placeholder="Nome do usuário"
+                    placeholder="Nome do usuario"
                     value={username}
                     onChange={(event) => setUsername(event.target.value)}
                     autoComplete="nickname"
@@ -261,7 +261,7 @@ const Login = () => {
                     </p>
                   ) : (
                     <p className="text-xs text-muted-foreground">
-                      Se a empresa não existir, o cadastro será bloqueado e você verá o aviso.
+                      Se a empresa nao existir, o cadastro sera bloqueado e voce vera o aviso.
                     </p>
                   )}
                 </div>
@@ -316,3 +316,4 @@ const Login = () => {
 };
 
 export default Login;
+

@@ -2,17 +2,12 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const DEFAULT_PROJECT_REF = 'awkvzbpnihtgceqdwisc';
-const SUPABASE_PROJECT_REF =
-  import.meta.env.VITE_SUPABASE_PROJECT_REF ||
-  import.meta.env.VITE_SUPABASE_PROJECT_ID ||
-  DEFAULT_PROJECT_REF;
-const SUPABASE_URL =
-  import.meta.env.VITE_SUPABASE_URL ||
-  `https://${SUPABASE_PROJECT_REF}.supabase.co`;
-const SUPABASE_PUBLISHABLE_KEY =
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-  import.meta.env.VITE_SUPABASE_ANON_KEY;
+const DEFAULT_SUPABASE_URL = 'https://awkvzbpnihtgceqdwisc.supabase.co';
+const DEFAULT_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_czq_XwvIyrAeg1lXbuh7pQ_XjfeonmL';
+
+// Keep production connection stable even when external env providers are inconsistent.
+const SUPABASE_URL = DEFAULT_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = DEFAULT_SUPABASE_PUBLISHABLE_KEY;
 
 if (!SUPABASE_PUBLISHABLE_KEY) {
   throw new Error('VITE_SUPABASE_PUBLISHABLE_KEY (ou VITE_SUPABASE_ANON_KEY) nao configurada.');
