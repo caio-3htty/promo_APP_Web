@@ -20,6 +20,8 @@ import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
 const AccessRequestReview = lazy(() => import("./pages/AccessRequestReview"));
+const AlertasManager = lazy(() => import("./pages/AlertasManager"));
+const AlmoxarifeRapido = lazy(() => import("./pages/AlmoxarifeRapido"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const EstoqueManager = lazy(() => import("./pages/EstoqueManager"));
 const FornecedoresManager = lazy(() => import("./pages/FornecedoresManager"));
@@ -28,7 +30,9 @@ const MaterialFornecedorManager = lazy(() => import("./pages/MaterialFornecedorM
 const ObrasManager = lazy(() => import("./pages/ObrasManager"));
 const PedidosCompraManager = lazy(() => import("./pages/PedidosCompraManager"));
 const RecebimentoManager = lazy(() => import("./pages/RecebimentoManager"));
+const RelatoriosPedidos = lazy(() => import("./pages/RelatoriosPedidos"));
 const SemAcesso = lazy(() => import("./pages/SemAcesso"));
+const SubstituicoesManager = lazy(() => import("./pages/SubstituicoesManager"));
 const UsuariosAcessos = lazy(() => import("./pages/UsuariosAcessos"));
 
 const queryClient = new QueryClient();
@@ -178,6 +182,54 @@ const App = () => (
                         <RequireObraPermission permission="estoque.view">
                           {lazyPage(<EstoqueManager />)}
                         </RequireObraPermission>
+                      </RequireObraAccess>
+                    </RequireRole>
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/dashboard/:obraId/alertas"
+                element={(
+                  <ProtectedRoute>
+                    <RequireRole allowed={["master", "gestor", "almoxarife", "engenheiro"]}>
+                      <RequireObraAccess>
+                        {lazyPage(<AlertasManager />)}
+                      </RequireObraAccess>
+                    </RequireRole>
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/dashboard/:obraId/substituicoes"
+                element={(
+                  <ProtectedRoute>
+                    <RequireRole allowed={["master", "gestor", "engenheiro"]}>
+                      <RequireObraAccess>
+                        {lazyPage(<SubstituicoesManager />)}
+                      </RequireObraAccess>
+                    </RequireRole>
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/dashboard/:obraId/almoxarife"
+                element={(
+                  <ProtectedRoute>
+                    <RequireRole allowed={["master", "gestor", "almoxarife"]}>
+                      <RequireObraAccess>
+                        {lazyPage(<AlmoxarifeRapido />)}
+                      </RequireObraAccess>
+                    </RequireRole>
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/dashboard/:obraId/relatorios"
+                element={(
+                  <ProtectedRoute>
+                    <RequireRole allowed={["master", "gestor", "engenheiro"]}>
+                      <RequireObraAccess>
+                        {lazyPage(<RelatoriosPedidos />)}
                       </RequireObraAccess>
                     </RequireRole>
                   </ProtectedRoute>

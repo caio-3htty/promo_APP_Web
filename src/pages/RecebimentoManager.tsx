@@ -22,6 +22,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { canReceivePedidos } from "@/lib/rbac";
+import { PEDIDO_STATUS, pedidoStatusLabels, type PedidoStatus } from "@/lib/pedidoStatus";
 
 interface PedidoCompra {
   id: string;
@@ -31,7 +32,7 @@ interface PedidoCompra {
   quantidade: number;
   preco_unit: number;
   total: number;
-  status: string;
+  status: PedidoStatus;
   codigo_compra: string | null;
   criado_em: string;
   data_recebimento: string | null;
@@ -44,15 +45,18 @@ type BadgeVariant = "default" | "secondary" | "outline" | "destructive";
 
 const statusColor = (status: string): BadgeVariant => {
   switch (status) {
-    case "pendente":
+    case PEDIDO_STATUS.CRIADO:
       return "secondary";
-    case "aprovado":
-      return "default";
-    case "enviado":
+    case PEDIDO_STATUS.APROVANDO:
       return "outline";
-    case "entregue":
+    case PEDIDO_STATUS.PRODUCAO:
       return "default";
-    case "cancelado":
+    case PEDIDO_STATUS.EM_TRANSPORTE:
+      return "outline";
+    case PEDIDO_STATUS.ENTREGUE:
+      return "default";
+    case PEDIDO_STATUS.ATRASADO:
+    case PEDIDO_STATUS.CANCELADO:
       return "destructive";
     default:
       return "secondary";
@@ -77,7 +81,7 @@ const RecebimentoManager = () => {
         .from("pedidos_compra")
         .select("*, obras(name), materiais(nome, unidade), fornecedores(nome)")
         .is("deleted_at", null)
-        .in("status", ["aprovado", "enviado", "entregue"])
+        .in("status", [PEDIDO_STATUS.PRODUCAO, PEDIDO_STATUS.EM_TRANSPORTE, PEDIDO_STATUS.ATRASADO, PEDIDO_STATUS.ENTREGUE])
         .order("criado_em", { ascending: false });
 
       if (obraId) {
@@ -115,7 +119,7 @@ const RecebimentoManager = () => {
       }
 
       const pedidoPayload: TablesUpdate<"pedidos_compra"> = {
-        status: "entregue",
+        status: PEDIDO_STATUS.ENTREGUE,
         codigo_compra: payload.codigo.trim(),
         data_recebimento: new Date(payload.dataRec).toISOString(),
         recebido_por: user?.id ?? null,
@@ -242,15 +246,17 @@ const RecebimentoManager = () => {
                   <td className="px-4 py-3 text-right tabular-nums">{item.quantidade}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(item.total)}</td>
                   <td className="px-4 py-3">
-                    <Badge variant={statusColor(item.status)}>{item.status}</Badge>
+                    <Badge variant={statusColor(item.status)}>
+                      {pedidoStatusLabels[item.status] ?? item.status}
+                    </Badge>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {item.status !== "entregue" && canReceive ? (
+                    {item.status !== PEDIDO_STATUS.ENTREGUE && canReceive ? (
                       <Button size="sm" onClick={() => openReceive(item)}>
                         <PackageCheck className="mr-1 h-4 w-4" />
                         Receber
                       </Button>
-                    ) : item.status === "entregue" ? (
+                    ) : item.status === PEDIDO_STATUS.ENTREGUE ? (
                       <span className="text-xs text-muted-foreground">
                         {item.data_recebimento
                           ? new Date(item.data_recebimento).toLocaleDateString("pt-BR")

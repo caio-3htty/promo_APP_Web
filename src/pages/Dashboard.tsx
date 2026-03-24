@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ChevronLeft, ClipboardList, Layers3, LogOut, PackageSearch, Truck } from "lucide-react";
+import { BellRing, ChevronLeft, ClipboardList, Layers3, LineChart, LogOut, PackageSearch, RefreshCw, Shuffle, Truck } from "lucide-react";
 
 import logoPrumo from "@/assets/image.png";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -24,7 +24,18 @@ const Dashboard = () => {
       { label: t("orders"), icon: ClipboardList, path: `/dashboard/${obraId}/pedidos` },
       { label: t("receipt"), icon: Truck, path: `/dashboard/${obraId}/recebimento` },
       { label: t("stock"), icon: PackageSearch, path: `/dashboard/${obraId}/estoque` },
+      { label: "Alertas", icon: BellRing, path: `/dashboard/${obraId}/alertas` },
+      { label: "Substituicoes", icon: Shuffle, path: `/dashboard/${obraId}/substituicoes` },
+      { label: "Relatorios", icon: LineChart, path: `/dashboard/${obraId}/relatorios` },
     ];
+
+    if (role === "master" || role === "gestor" || role === "almoxarife") {
+      base.push({
+        label: "Modo Almoxarife",
+        icon: RefreshCw,
+        path: `/dashboard/${obraId}/almoxarife`,
+      });
+    }
 
     if (canManageCadastros(role)) {
       base.push({

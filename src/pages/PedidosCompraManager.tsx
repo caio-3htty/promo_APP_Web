@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Eye, Pencil, Plus, Search, SkipForward, Trash2 } from "lucide-react";
 import { useParams } from "react-router-dom";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -27,7 +27,14 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
-import { canApprovePedidos, canEditPedidosBase } from "@/lib/rbac";
+import { canApprovePedidos, canEditPedidosBase, canReceivePedidos } from "@/lib/rbac";
+import {
+  PEDIDO_STATUS,
+  getNextPedidoStatus,
+  pedidoStatusFlow,
+  pedidoStatusLabels,
+  type PedidoStatus,
+} from "@/lib/pedidoStatus";
 
 interface PedidoCompra {
   id: string;
@@ -37,8 +44,9 @@ interface PedidoCompra {
   quantidade: number;
   preco_unit: number;
   total: number;
-  status: string;
+  status: PedidoStatus;
   codigo_compra: string | null;
+  observacoes: string | null;
   criado_por: string | null;
   criado_em: string;
   deleted_at: string | null;
@@ -53,8 +61,9 @@ interface FormState {
   fornecedor_id: string;
   quantidade: string;
   preco_unit: string;
-  status: string;
+  status: PedidoStatus;
   codigo_compra: string;
+  observacoes: string;
 }
 
 const emptyForm: FormState = {
@@ -63,8 +72,9 @@ const emptyForm: FormState = {
   fornecedor_id: "",
   quantidade: "",
   preco_unit: "",
-  status: "pendente",
+  status: PEDIDO_STATUS.CRIADO,
   codigo_compra: "",
+  observacoes: "",
 };
 
 const formSchema = z.object({
@@ -75,34 +85,41 @@ const formSchema = z.object({
   preco_unit: z.string().refine((value) => Number(value) > 0, "Preco unitario deve ser maior que zero"),
   status: z.string().min(1),
   codigo_compra: z.string().optional(),
+  observacoes: z.string().optional(),
 });
-
-const statusOptions = [
-  { value: "pendente", label: "Pendente" },
-  { value: "aprovado", label: "Aprovado" },
-  { value: "enviado", label: "Enviado" },
-  { value: "entregue", label: "Entregue" },
-  { value: "cancelado", label: "Cancelado" },
-];
 
 type BadgeVariant = "default" | "secondary" | "outline" | "destructive";
 
-const statusColor = (status: string): BadgeVariant => {
+const statusColor = (status: PedidoStatus): BadgeVariant => {
   switch (status) {
-    case "pendente":
+    case PEDIDO_STATUS.CRIADO:
       return "secondary";
-    case "aprovado":
-      return "default";
-    case "enviado":
+    case PEDIDO_STATUS.APROVANDO:
       return "outline";
-    case "entregue":
+    case PEDIDO_STATUS.PRODUCAO:
       return "default";
-    case "cancelado":
+    case PEDIDO_STATUS.EM_TRANSPORTE:
+      return "outline";
+    case PEDIDO_STATUS.ENTREGUE:
+      return "default";
+    case PEDIDO_STATUS.ATRASADO:
+      return "destructive";
+    case PEDIDO_STATUS.CANCELADO:
       return "destructive";
     default:
       return "secondary";
   }
 };
+
+const statusOptions: Array<{ value: PedidoStatus; label: string }> = [
+  { value: PEDIDO_STATUS.CRIADO, label: pedidoStatusLabels[PEDIDO_STATUS.CRIADO] },
+  { value: PEDIDO_STATUS.APROVANDO, label: pedidoStatusLabels[PEDIDO_STATUS.APROVANDO] },
+  { value: PEDIDO_STATUS.PRODUCAO, label: pedidoStatusLabels[PEDIDO_STATUS.PRODUCAO] },
+  { value: PEDIDO_STATUS.EM_TRANSPORTE, label: pedidoStatusLabels[PEDIDO_STATUS.EM_TRANSPORTE] },
+  { value: PEDIDO_STATUS.ENTREGUE, label: pedidoStatusLabels[PEDIDO_STATUS.ENTREGUE] },
+  { value: PEDIDO_STATUS.ATRASADO, label: pedidoStatusLabels[PEDIDO_STATUS.ATRASADO] },
+  { value: PEDIDO_STATUS.CANCELADO, label: pedidoStatusLabels[PEDIDO_STATUS.CANCELADO] },
+];
 
 const PedidosCompraManager = () => {
   const { obraId } = useParams();
@@ -111,14 +128,15 @@ const PedidosCompraManager = () => {
 
   const canEditBase = canEditPedidosBase(role);
   const canApprove = canApprovePedidos(role);
+  const canReceive = canReceivePedidos(role);
   const canDelete = role === "master" || role === "gestor";
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<PedidoCompra | null>(null);
   const [detailItem, setDetailItem] = useState<PedidoCompra | null>(null);
-  const [approvalItem, setApprovalItem] = useState<PedidoCompra | null>(null);
-  const [approvalStatus, setApprovalStatus] = useState<"aprovado" | "cancelado">("aprovado");
-  const [approvalCodigo, setApprovalCodigo] = useState("");
+  const [transitionItem, setTransitionItem] = useState<PedidoCompra | null>(null);
+  const [transitionTarget, setTransitionTarget] = useState<PedidoStatus>(PEDIDO_STATUS.APROVANDO);
+  const [transitionCodigo, setTransitionCodigo] = useState("");
   const [form, setForm] = useState<FormState>({ ...emptyForm, obra_id: obraId ?? "" });
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -214,12 +232,17 @@ const PedidosCompraManager = () => {
         quantidade: qty,
         preco_unit: unitPrice,
         total: qty * unitPrice,
-        status: role === "operacional" ? "pendente" : values.status,
+        status: role === "operacional" ? PEDIDO_STATUS.CRIADO : values.status,
         codigo_compra: values.codigo_compra || null,
       };
 
       if (values.id) {
-        const { error } = await supabase.from("pedidos_compra").update(payload).eq("id", values.id);
+        const updatePayload = {
+          ...payload,
+          observacoes: values.observacoes || null,
+        } as TablesUpdate<"pedidos_compra">;
+
+        const { error } = await supabase.from("pedidos_compra").update(updatePayload).eq("id", values.id);
         if (error) throw error;
       } else {
         const insertPayload: TablesInsert<"pedidos_compra"> = {
@@ -229,7 +252,12 @@ const PedidosCompraManager = () => {
           fornecedor_id: payload.fornecedor_id as string,
           criado_por: user?.id ?? null,
         };
-        const { error } = await supabase.from("pedidos_compra").insert(insertPayload);
+
+        // observacoes exists in DB but not in generated type
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const insertAny = { ...insertPayload, observacoes: values.observacoes || null } as any;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error } = await (supabase as any).from("pedidos_compra").insert(insertAny);
         if (error) throw error;
       }
     },
@@ -241,23 +269,28 @@ const PedidosCompraManager = () => {
     onError: (error: Error) => toast.error(error.message),
   });
 
-  const approveOrCancel = useMutation({
-    mutationFn: async (payload: { id: string; status: "aprovado" | "cancelado"; codigo_compra: string }) => {
-      const approvalPayload: TablesUpdate<"pedidos_compra"> = {
+  const transitionMutation = useMutation({
+    mutationFn: async (payload: { id: string; status: PedidoStatus; codigo_compra?: string | null }) => {
+      if (payload.status === PEDIDO_STATUS.ENTREGUE && !payload.codigo_compra?.trim()) {
+        throw new Error("Codigo de compra obrigatorio para concluir o pedido");
+      }
+
+      const transitionPayload: TablesUpdate<"pedidos_compra"> = {
         status: payload.status,
-        codigo_compra: payload.codigo_compra || null,
+        codigo_compra: payload.codigo_compra?.trim() || null,
       };
+
       const { error } = await supabase
         .from("pedidos_compra")
-        .update(approvalPayload)
+        .update(transitionPayload)
         .eq("id", payload.id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pedidos_compra", obraId] });
-      toast.success("Pedido atualizado");
-      setApprovalItem(null);
-      setApprovalCodigo("");
+      toast.success("Etapa do pedido atualizada");
+      setTransitionItem(null);
+      setTransitionCodigo("");
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -293,14 +326,17 @@ const PedidosCompraManager = () => {
       preco_unit: String(item.preco_unit),
       status: item.status,
       codigo_compra: item.codigo_compra ?? "",
+      observacoes: item.observacoes ?? "",
     });
     setOpen(true);
   };
 
-  const openApproval = (item: PedidoCompra, status: "aprovado" | "cancelado") => {
-    setApprovalItem(item);
-    setApprovalStatus(status);
-    setApprovalCodigo(item.codigo_compra ?? "");
+  const openTransition = (item: PedidoCompra, target?: PedidoStatus) => {
+    const possible = (pedidoStatusFlow[item.status] ?? []) as PedidoStatus[];
+    const selected = target ?? possible[0] ?? item.status;
+    setTransitionItem(item);
+    setTransitionTarget(selected);
+    setTransitionCodigo(item.codigo_compra ?? "");
   };
 
   const closeDialog = () => {
@@ -313,6 +349,11 @@ const PedidosCompraManager = () => {
     const parsed = formSchema.safeParse(payload);
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message ?? "Dados invalidos");
+      return;
+    }
+
+    if (payload.status === PEDIDO_STATUS.ENTREGUE && !payload.codigo_compra.trim()) {
+      toast.error("Codigo de compra obrigatorio para concluir o pedido");
       return;
     }
 
@@ -383,50 +424,61 @@ const PedidosCompraManager = () => {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((item) => (
-                <tr key={item.id} className="border-t border-border transition-colors hover:bg-muted/30">
-                  <td className="px-4 py-3 font-mono text-xs">{item.codigo_compra || item.id.slice(0, 8)}</td>
-                  {!obraId && <td className="px-4 py-3">{item.obras?.name}</td>}
-                  <td className="px-4 py-3">
-                    {item.materiais?.nome}
-                    <span className="ml-1 text-xs text-muted-foreground">({item.materiais?.unidade})</span>
-                  </td>
-                  <td className="px-4 py-3">{item.fornecedores?.nome}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{item.quantidade}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(item.total)}</td>
-                  <td className="px-4 py-3">
-                    <Badge variant={statusColor(item.status)}>{item.status}</Badge>
-                  </td>
-                  <td className="px-4 py-3 text-xs">{new Date(item.criado_em).toLocaleDateString("pt-BR")}</td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => setDetailItem(item)}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      {canEditBase && (
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(item)}>
-                          <Pencil className="h-4 w-4" />
+              {filtered.map((item) => {
+                const nextStatus = getNextPedidoStatus(item.status);
+                const canProgress = canApprove && !!nextStatus;
+
+                return (
+                  <tr key={item.id} className="border-t border-border transition-colors hover:bg-muted/30">
+                    <td className="px-4 py-3 font-mono text-xs">{item.codigo_compra || item.id.slice(0, 8)}</td>
+                    {!obraId && <td className="px-4 py-3">{item.obras?.name}</td>}
+                    <td className="px-4 py-3">
+                      {item.materiais?.nome}
+                      <span className="ml-1 text-xs text-muted-foreground">({item.materiais?.unidade})</span>
+                    </td>
+                    <td className="px-4 py-3">{item.fornecedores?.nome}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{item.quantidade}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(item.total)}</td>
+                    <td className="px-4 py-3">
+                      <Badge variant={statusColor(item.status)}>{pedidoStatusLabels[item.status] ?? item.status}</Badge>
+                    </td>
+                    <td className="px-4 py-3 text-xs">{new Date(item.criado_em).toLocaleDateString("pt-BR")}</td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => setDetailItem(item)}>
+                          <Eye className="h-4 w-4" />
                         </Button>
-                      )}
-                      {canDelete && (
-                        <Button variant="ghost" size="icon" onClick={() => softDelete.mutate(item.id)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      )}
-                      {canApprove && item.status !== "entregue" && item.status !== "cancelado" && (
-                        <>
-                          <Button size="sm" variant="outline" onClick={() => openApproval(item, "aprovado")}>
-                            Aprovar
+                        {canEditBase && item.status !== PEDIDO_STATUS.ENTREGUE && item.status !== PEDIDO_STATUS.CANCELADO && (
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(item)}>
+                            <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button size="sm" variant="destructive" onClick={() => openApproval(item, "cancelado")}>
-                            Cancelar
+                        )}
+                        {canDelete && (
+                          <Button variant="ghost" size="icon" onClick={() => softDelete.mutate(item.id)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        )}
+                        {canProgress && (
+                          <Button size="sm" variant="outline" onClick={() => openTransition(item, nextStatus!)}>
+                            <SkipForward className="mr-1 h-4 w-4" />
+                            Avancar
+                          </Button>
+                        )}
+                        {canApprove && item.status !== PEDIDO_STATUS.ATRASADO && (pedidoStatusFlow[item.status] ?? []).includes(PEDIDO_STATUS.ATRASADO) && (
+                          <Button size="sm" variant="destructive" onClick={() => openTransition(item, PEDIDO_STATUS.ATRASADO)}>
+                            Atrasar
+                          </Button>
+                        )}
+                        {canReceive && item.status !== PEDIDO_STATUS.ENTREGUE && (pedidoStatusFlow[item.status] ?? []).includes(PEDIDO_STATUS.ENTREGUE) && (
+                          <Button size="sm" onClick={() => openTransition(item, PEDIDO_STATUS.ENTREGUE)}>
+                            Entregar
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -450,7 +502,7 @@ const PedidosCompraManager = () => {
               </div>
               <div>
                 <span className="text-muted-foreground">Status:</span>{" "}
-                <Badge variant={statusColor(detailItem.status)}>{detailItem.status}</Badge>
+                <Badge variant={statusColor(detailItem.status)}>{pedidoStatusLabels[detailItem.status] ?? detailItem.status}</Badge>
               </div>
               <div className="col-span-2">
                 <span className="text-muted-foreground">Material:</span> {detailItem.materiais?.nome} ({detailItem.materiais?.unidade})
@@ -472,6 +524,11 @@ const PedidosCompraManager = () => {
                 <span className="text-muted-foreground">Criado em:</span>{" "}
                 {new Date(detailItem.criado_em).toLocaleString("pt-BR")}
               </div>
+              {detailItem.observacoes && (
+                <div className="col-span-2">
+                  <span className="text-muted-foreground">Observacoes:</span> {detailItem.observacoes}
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>
@@ -575,7 +632,7 @@ const PedidosCompraManager = () => {
                 <Label>Status</Label>
                 <Select
                   value={form.status}
-                  onValueChange={(value) => setForm({ ...form, status: value })}
+                  onValueChange={(value) => setForm({ ...form, status: value as PedidoStatus })}
                   disabled={role === "operacional"}
                 >
                   <SelectTrigger>
@@ -595,9 +652,18 @@ const PedidosCompraManager = () => {
                 <Input
                   value={form.codigo_compra}
                   onChange={(event) => setForm({ ...form, codigo_compra: event.target.value })}
-                  placeholder="Opcional"
+                  placeholder="Obrigatorio para pedido entregue"
                 />
               </div>
+            </div>
+
+            <div>
+              <Label>Observacoes</Label>
+              <Input
+                value={form.observacoes}
+                onChange={(event) => setForm({ ...form, observacoes: event.target.value })}
+                placeholder="Contexto operacional do pedido"
+              />
             </div>
           </div>
           <DialogFooter>
@@ -611,46 +677,68 @@ const PedidosCompraManager = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!approvalItem} onOpenChange={() => setApprovalItem(null)}>
+      <Dialog open={!!transitionItem} onOpenChange={() => setTransitionItem(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{approvalStatus === "aprovado" ? "Aprovar pedido" : "Cancelar pedido"}</DialogTitle>
+            <DialogTitle>Atualizar etapa do pedido</DialogTitle>
           </DialogHeader>
-          {approvalItem && (
+          {transitionItem && (
             <div className="space-y-4">
               <div className="rounded-md border border-border p-3 text-sm">
                 <p>
-                  <span className="text-muted-foreground">Pedido:</span> {approvalItem.id.slice(0, 8)}
+                  <span className="text-muted-foreground">Pedido:</span> {transitionItem.id.slice(0, 8)}
                 </p>
                 <p>
-                  <span className="text-muted-foreground">Material:</span> {approvalItem.materiais?.nome}
+                  <span className="text-muted-foreground">Status atual:</span> {pedidoStatusLabels[transitionItem.status]}
+                </p>
+                <p>
+                  <span className="text-muted-foreground">Material:</span> {transitionItem.materiais?.nome}
                 </p>
               </div>
 
               <div>
-                <Label>Codigo de compra</Label>
+                <Label>Nova etapa</Label>
+                <Select
+                  value={transitionTarget}
+                  onValueChange={(value) => setTransitionTarget(value as PedidoStatus)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(pedidoStatusFlow[transitionItem.status] ?? []).map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {pedidoStatusLabels[status]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Codigo de compra {transitionTarget === PEDIDO_STATUS.ENTREGUE ? "*" : ""}</Label>
                 <Input
-                  value={approvalCodigo}
-                  onChange={(event) => setApprovalCodigo(event.target.value)}
-                  placeholder="Opcional"
+                  value={transitionCodigo}
+                  onChange={(event) => setTransitionCodigo(event.target.value)}
+                  placeholder="Obrigatorio para concluir entrega"
                 />
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setApprovalItem(null)}>
+            <Button variant="outline" onClick={() => setTransitionItem(null)}>
               Fechar
             </Button>
             <Button
               onClick={() =>
-                approvalItem &&
-                approveOrCancel.mutate({
-                  id: approvalItem.id,
-                  status: approvalStatus,
-                  codigo_compra: approvalCodigo,
+                transitionItem &&
+                transitionMutation.mutate({
+                  id: transitionItem.id,
+                  status: transitionTarget,
+                  codigo_compra: transitionCodigo,
                 })
               }
-              disabled={approveOrCancel.isPending}
+              disabled={transitionMutation.isPending}
             >
               Confirmar
             </Button>

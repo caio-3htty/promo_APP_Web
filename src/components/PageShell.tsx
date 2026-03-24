@@ -22,6 +22,18 @@ export const PageShell = ({ title, children }: { title: string; children: React.
       ? [
           { label: "Recebimento", path: `/dashboard/${obraId}/recebimento` },
           ...(can("estoque.view", obraId) ? [{ label: "Estoque", path: `/dashboard/${obraId}/estoque` }] : []),
+          ...(role === "master" || role === "gestor" || role === "almoxarife"
+            ? [{ label: "Almoxarife Rapido", path: `/dashboard/${obraId}/almoxarife` }]
+            : []),
+          ...(role === "master" || role === "gestor" || role === "engenheiro" || role === "almoxarife"
+            ? [{ label: "Alertas", path: `/dashboard/${obraId}/alertas` }]
+            : []),
+          ...(role === "master" || role === "gestor" || role === "engenheiro"
+            ? [{ label: "Substituicoes", path: `/dashboard/${obraId}/substituicoes` }]
+            : []),
+          ...(role === "master" || role === "gestor" || role === "engenheiro"
+            ? [{ label: "Relatorios", path: `/dashboard/${obraId}/relatorios` }]
+            : []),
         ]
       : []),
   ];
