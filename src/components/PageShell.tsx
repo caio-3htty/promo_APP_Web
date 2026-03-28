@@ -52,13 +52,22 @@ export const PageShell = ({ title, children }: { title: string; children: React.
 
   const navItems = inObraRoute ? obraNav : globalNav;
   const goBackPath = inObraRoute ? `/dashboard/${obraId}` : "/";
+  const handleBack = () => {
+    const historyIndex = typeof window !== "undefined" ? window.history.state?.idx : undefined;
+    const canGoBackInApp = typeof historyIndex === "number" && historyIndex > 0;
+    if (canGoBackInApp) {
+      navigate(-1);
+      return;
+    }
+    navigate(goBackPath);
+  };
 
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 md:px-8">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate(goBackPath)}>
+            <Button variant="ghost" size="icon" onClick={handleBack}>
               <ChevronLeft className="h-5 w-5" />
             </Button>
             <h1 className="text-lg font-bold">{title}</h1>
